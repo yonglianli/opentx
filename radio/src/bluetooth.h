@@ -47,7 +47,7 @@ enum BluetoothStates {
 
 constexpr uint8_t LEN_BLUETOOTH_ADDR =         16;
 constexpr uint8_t MAX_BLUETOOTH_DISTANT_ADDR = 6;
-constexpr uint8_t BLUETOOTH_BUFFER_SIZE =      80;
+constexpr uint8_t BLUETOOTH_BUFFER_SIZE =      128;
 
 class Bluetooth
 {
