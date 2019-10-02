@@ -403,6 +403,7 @@ static int luaSportTelemetryPop(lua_State * L)
     lua_pushnumber(L, packet.primId);
     lua_pushnumber(L, packet.dataId);
     lua_pushunsigned(L, packet.value);
+    TRACE("Id:%d PrimId:%d DataId:%d Val:%d,", packet.physicalId, packet.primId, packet.dataId, packet.value);
     return 4;
   }
 
@@ -442,7 +443,7 @@ When called without parameters, it will only return the status of the output buf
 
 static int luaSportTelemetryPush(lua_State * L)
 {
-  if (telemetryProtocol != PROTOCOL_TELEMETRY_FRSKY_SPORT) {
+  if (!IS_FRSKY_SPORT_PROTOCOL()) {
     lua_pushboolean(L, false);
     return 1;
   }
