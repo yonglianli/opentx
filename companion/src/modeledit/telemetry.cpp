@@ -600,7 +600,6 @@ TelemetrySensorPanel::TelemetrySensorPanel(QWidget *parent, SensorData & sensor,
 {
   ui->setupUi(this);
   ui->id->setField(sensor.id, this);
-  ui->instance->setField(sensor.instance, this);
   ui->ratio->setField(sensor.ratio, this);
   ui->offset->setField(sensor.offset, this);
   ui->autoOffset->setField(sensor.autoOffset, this);
@@ -652,7 +651,7 @@ void TelemetrySensorPanel::update()
     ui->idLabel->hide();
     ui->id->hide();
     ui->instanceLabel->hide();
-    ui->instance->hide();
+    ui->instanceSB->hide();
     ui->originLabel->hide();
     ui->origin->hide();
     ui->formula->show();
@@ -677,7 +676,7 @@ void TelemetrySensorPanel::update()
     ui->idLabel->show();
     ui->id->show();
     ui->instanceLabel->show();
-    ui->instance->show();
+    ui->instanceSB->show();
     QString origin = sensor.getOrigin(model);
     ui->originLabel->setVisible(!origin.isEmpty());
     ui->origin->setVisible(!origin.isEmpty());
@@ -713,6 +712,8 @@ void TelemetrySensorPanel::update()
       }
     }
   }
+  
+  ui->instanceSB->setValue((sensor.instance & 0x1F) + 1);
 
   ui->ratioLabel->setVisible(ratioFieldsDisplayed && sensor.unit != SensorData::UNIT_RPMS);
   ui->bladesLabel->setVisible(sensor.unit == SensorData::UNIT_RPMS);
@@ -788,6 +789,15 @@ void TelemetrySensorPanel::on_type_currentIndexChanged(int index)
   if (!lock) {
     sensor.type = index;
     update();
+    emit modified();
+  }
+}
+
+void TelemetrySensorPanel::on_instanceSB_valueChanged(double value)
+{
+  if (!lock) {
+    sensor.instance = value - 1;
+    emit dataModified();
     emit modified();
   }
 }

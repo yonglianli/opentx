@@ -102,7 +102,7 @@
     </widget>
    </item>
    <item>
-    <widget class="AutoDoubleSpinBox" name="instance">
+    <widget class="QDoubleSpinBox" name="instanceSB">
      <property name="enabled">
       <bool>true</bool>
      </property>
@@ -115,8 +115,11 @@
      <property name="decimals">
       <number>0</number>
      </property>
+     <property name="minimum">
+      <double>1.000000000000000</double>
+     </property>
      <property name="maximum">
-      <double>255.000000000000000</double>
+      <double>32.000000000000000</double>
      </property>
     </widget>
    </item>
