@@ -118,15 +118,14 @@ void setupPulsesMulti(uint8_t moduleIdx)
   }
 #endif
   sendFrameProtocolHeader(moduleIdx, type);
-  if(type&MULTI_FAILSAFE)
+  if (type&MULTI_FAILSAFE)
     sendFailsafeChannels(moduleIdx);
   else
     sendChannels(moduleIdx);
 #if defined(LUA)
-  if(type&MULTI_DATA)
+  if (type&MULTI_DATA)
     sendSport(moduleIdx);	//8 bytes of additional data
 #endif
-}
 
 void setupPulsesMultiExternalModule()
 {
