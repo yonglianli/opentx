@@ -139,4 +139,6 @@ void delay_ms(uint32_t ms);
 }
 #endif
 
+#include "mixer_scheduler_driver.h"
+
 #endif
