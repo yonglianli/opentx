@@ -61,7 +61,6 @@ enum MultiBufferState : uint8_t
 #if defined(INTERNAL_MODULE_MULTI)
 
 static MultiModuleStatus multiModuleStatus[NUM_MODULES] = {MultiModuleStatus(), MultiModuleStatus()};
-static MultiModuleSyncStatus multiSyncStatus[NUM_MODULES] = {MultiModuleSyncStatus(), MultiModuleSyncStatus()};
 static uint8_t multiBindStatus[NUM_MODULES] = {MULTI_NORMAL_OPERATION, MULTI_NORMAL_OPERATION};
 
 static MultiBufferState multiTelemetryBufferState[NUM_MODULES];
@@ -69,11 +68,6 @@ static MultiBufferState multiTelemetryBufferState[NUM_MODULES];
 MultiModuleStatus &getMultiModuleStatus(uint8_t module)
 {
   return multiModuleStatus[module];
-}
-
-MultiModuleSyncStatus &getMultiSyncStatus(uint8_t module)
-{
-  return multiSyncStatus[module];
 }
 
 uint8_t getMultiBindStatus(uint8_t module)
@@ -103,7 +97,6 @@ uint8_t intTelemetryRxBufferCount;
 #else // !INTERNAL_MODULE_MULTI
 
 static MultiModuleStatus multiModuleStatus;
-static MultiModuleSyncStatus multiSyncStatus;
 static uint8_t multiBindStatus = MULTI_NORMAL_OPERATION;
 
 static MultiBufferState multiTelemetryBufferState;
@@ -111,11 +104,6 @@ static MultiBufferState multiTelemetryBufferState;
 MultiModuleStatus& getMultiModuleStatus(uint8_t)
 {
   return multiModuleStatus;
-}
-
-MultiModuleSyncStatus& getMultiSyncStatus(uint8_t)
-{
-  return multiSyncStatus;
 }
 
 uint8_t getMultiBindStatus(uint8_t)
@@ -222,24 +210,41 @@ static void processMultiStatusPacket(const uint8_t * data, uint8_t module)
 
 static void processMultiSyncPacket(const uint8_t * data, uint8_t module)
 {
-  MultiModuleSyncStatus &status = getMultiSyncStatus(module);
+  ModuleSyncStatus &status = getModuleSyncStatus(module);
 
-  status.lastUpdate = get_tmr10ms();
-  status.interval = data[4];
-  status.target = data[5];
-#if !defined(PPM_PIN_SERIAL)
-  auto oldlag = status.inputLag;
-  (void) oldlag;
-#endif
+//   status.lastUpdate = get_tmr10ms();
+//   status.interval = data[4];
+//   status.target = data[5];
+// #if !defined(PPM_PIN_SERIAL)
+//   auto oldlag = status.inputLag;
+//   (void) oldlag;
+// #endif
 
-  status.calcAdjustedRefreshRate(data[0] << 8 | data[1], data[2] << 8 | data[3]);
+//   uint16_t refreshRate = data[0] << 8 | data[1];
+//   status.calcAdjustedRefreshRate(refreshRate, data[2] << 8 | data[3]);
 
-#if !defined(PPM_PIN_SERIAL)
-  TRACE("MP ADJ: rest: %d, lag %04d, diff: %04d  target: %d, interval: %d, Refresh: %d, intAdjRefresh: %d, adjRefresh %d\r\n",
-        module == EXTERNAL_MODULE ? extmodulePulsesData.dsm2.rest : 0,
-        status.inputLag, oldlag - status.inputLag, status.target, status.interval, status.refreshRate, status.adjustedRefreshRate / 50,
-        status.getAdjustedRefreshRate());
-#endif
+//   serialPrint("MP ADJ: R %d, L %04d, T %03d, calc %04d",
+//               refreshRate,
+//               data[2] << 8 | data[3],
+//               status.target,
+//               status.getAdjustedRefreshRate()/2);
+  uint16_t refreshRate = data[0] << 8 | data[1];
+  int16_t  inputLag    = data[2] << 8 | data[3];
+
+  // if (inputLag > refreshRate/2)
+  //   inputLag -= refreshRate;
+
+  status.update(refreshRate, inputLag);
+
+  serialPrint("MP ADJ: R %d, L %04d",
+              refreshRate, inputLag);
+
+// #if !defined(PPM_PIN_SERIAL)
+//   TRACE("MP ADJ: rest: %d, lag %04d, diff: %04d  target: %d, interval: %d, Refresh: %d, intAdjRefresh: %d, adjRefresh %d\r\n",
+//         module == EXTERNAL_MODULE ? extmodulePulsesData.dsm2.rest : 0,
+//         status.inputLag, oldlag - status.inputLag, status.target, status.interval, status.refreshRate, status.adjustedRefreshRate / 50,
+//         status.getAdjustedRefreshRate());
+// #endif
 }
 
 #if defined(PCBTARANIS) || defined(PCBHORUS)
@@ -391,115 +396,6 @@ static void appendInt(char * buf, uint32_t val)
     buf++;
 
   strAppendUnsigned(buf, val);
-}
-
-#define MIN_REFRESH_RATE      7000
-
-void MultiModuleSyncStatus::calcAdjustedRefreshRate(uint16_t newRefreshRate, uint16_t newInputLag)
-{
-  // Check how far off we are from our target, positive means we are too slow, negative we are too fast
-  int lagDifference = newInputLag - inputLag;
-
-  // The refresh rate that we target
-  // Below is least common multiple of MIN_REFRESH_RATE and requested rate
-  uint16_t targetRefreshRate = (uint16_t) (newRefreshRate * ((MIN_REFRESH_RATE / (newRefreshRate - 1)) + 1));
-
-  // Overflow, reverse sample
-  if (lagDifference < -targetRefreshRate / 2)
-    lagDifference = -lagDifference;
-
-
-  // Reset adjusted refresh if rate has changed
-  if (newRefreshRate != refreshRate) {
-    refreshRate = newRefreshRate;
-    adjustedRefreshRate = targetRefreshRate;
-    if (adjustedRefreshRate >= 30000)
-      adjustedRefreshRate /= 2;
-
-    // Our refresh rate in ps
-    adjustedRefreshRate *= 1000;
-    return;
-  }
-
-  // Caluclate how many samples went into the reported input Lag (*10)
-  int numsamples = interval * 10000 / targetRefreshRate;
-
-  // Convert lagDifference to ps
-  lagDifference = lagDifference * 1000;
-
-  // Calculate the time we intentionally were late/early
-  if (inputLag > target * 10 + 30)
-    lagDifference += numsamples * 500;
-  else if (inputLag < target * 10 - 30)
-    lagDifference -= numsamples * 500;
-
-  // Caculate the time in ps each frame is to slow (positive), fast(negative)
-  int perframeps = lagDifference * 10 / numsamples;
-
-  if (perframeps > 20000)
-    perframeps = 20000;
-
-  if (perframeps < -20000)
-    perframeps = -20000;
-
-  adjustedRefreshRate = (adjustedRefreshRate + perframeps);
-
-  // Safeguards
-  if (adjustedRefreshRate < 6 * 1000 * 1000)
-    adjustedRefreshRate = 6 * 1000 * 1000;
-  if (adjustedRefreshRate > 30 * 1000 * 1000)
-    adjustedRefreshRate = 30 * 1000 * 1000;
-
-  inputLag = newInputLag;
-}
-
-static uint8_t counter;
-
-uint16_t MultiModuleSyncStatus::getAdjustedRefreshRate()
-{
-  if (!isValid() || refreshRate == 0)
-    return 18000;
-
-
-  counter = (uint8_t) (counter + 1 % 10);
-  uint16_t rate = (uint16_t) ((adjustedRefreshRate + counter * 50) / 500);
-  // Check how far off we are from our target, positive means we are too slow, negative we are too fast
-  if (inputLag > target * 10 + 30)
-    return (uint16_t) (rate - 1);
-  else if (inputLag < target * 10 - 30)
-    return (uint16_t) (rate + 1);
-  else
-    return rate;
-}
-
-
-static void prependSpaces(char * buf, int val)
-{
-  while (*buf)
-    buf++;
-
-  int k = 10000;
-  while (val / k == 0 && k > 0) {
-    *buf = ' ';
-    buf++;
-    k /= 10;
-  }
-  *buf = '\0';
-}
-
-void MultiModuleSyncStatus::getRefreshString(char * statusText)
-{
-  if (!isValid()) {
-    return;
-  }
-
-  strcpy(statusText, "L ");
-  prependSpaces(statusText, inputLag);
-  appendInt(statusText, inputLag);
-  strcat(statusText, "ns R ");
-  prependSpaces(statusText, adjustedRefreshRate / 1000);
-  appendInt(statusText, (uint32_t) (adjustedRefreshRate / 1000));
-  strcat(statusText, "ns");
 }
 
 void MultiModuleStatus::getStatusString(char * statusText)

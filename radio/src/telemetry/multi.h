@@ -91,30 +91,6 @@ void processMultiTelemetryData(uint8_t data, uint8_t module);
 
 #define MULTI_SCANNER_MAX_CHANNEL 249
 
-// This should be put into the Module definition if other modules gain this functionality
-struct MultiModuleSyncStatus {
-  uint32_t adjustedRefreshRate;    // in ps
-  tmr10ms_t lastUpdate;
-  uint16_t refreshRate;
-  uint16_t inputLag;
-  uint8_t interval;
-  uint8_t target;
-
-  inline bool isValid() {return (get_tmr10ms()  - lastUpdate < 100);}
-  void getRefreshString(char* refreshText);
-  uint16_t getAdjustedRefreshRate();
-  void calcAdjustedRefreshRate(uint16_t newRefreshRate, uint16_t newInputLag);
-
-  MultiModuleSyncStatus() {
-    // Initialise to a valid value
-    adjustedRefreshRate=9000 * 1000;
-  }
-
-};
-
-MultiModuleSyncStatus& getMultiSyncStatus(uint8_t module);
-
-
 struct MultiModuleStatus {
 
   uint8_t major;
