@@ -348,6 +348,7 @@ static void enablePulsesInternalModule(uint8_t protocol)
       break;
 #endif
     default:
+      mixerSchedulerStart();
       break;
   }
 }
